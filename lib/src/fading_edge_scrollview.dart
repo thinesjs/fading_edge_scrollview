@@ -220,21 +220,22 @@ class FadingEdgeScrollViewState extends State<FadingEdgeScrollView>
         ),
       );
 
-  Gradient _createShaderGradient() => LinearGradient(
-        begin: _gradientStart,
-        end: _gradientEnd,
-        stops: [
-          0,
-          widget.gradientFractionOnStart * 0.5,
-          1 - widget.gradientFractionOnEnd * 0.5,
-          1,
-        ],
-        colors: _getColors(
-            widget.gradientFractionOnStart > 0 &&
-                _scrollState.isShowGradientAtStart,
-            widget.gradientFractionOnEnd > 0 &&
-                _scrollState.isShowGradientAtEnd),
-      );
+  Gradient _createShaderGradient() {
+    final startOpacity = _calculateOpacity(widget.gradientFractionOnStart, true);
+    final endOpacity = _calculateOpacity(widget.gradientFractionOnEnd, false);
+
+    return LinearGradient(
+      begin: _gradientStart,
+      end: _gradientEnd,
+      stops: [
+        0,
+        widget.gradientFractionOnStart * 0.5,
+        1 - widget.gradientFractionOnEnd * 0.5,
+        1,
+      ],
+      colors: _getColors(startOpacity, endOpacity),
+    );
+  }
 
   AlignmentGeometry get _gradientStart =>
       widget.scrollDirection == Axis.vertical
@@ -258,12 +259,32 @@ class FadingEdgeScrollViewState extends State<FadingEdgeScrollView>
       ? AlignmentDirectional.centerStart
       : AlignmentDirectional.centerEnd;
 
-  List<Color> _getColors(bool showGradientAtStart, bool showGradientAtEnd) => [
-        (showGradientAtStart ? Colors.transparent : Colors.white),
+  List<Color> _getColors(double startOpacity, double endOpacity) => [
+        Colors.white.withOpacity(startOpacity),
         Colors.white,
         Colors.white,
-        (showGradientAtEnd ? Colors.transparent : Colors.white)
+        Colors.white.withOpacity(endOpacity),
       ];
+
+  double _calculateOpacity(double gradientFraction, bool isStart) {
+    if (!_controllerIsReady) return 0.0;
+
+    final double fadeLength = 40.0;
+
+    final offset = _controller.positions.last.pixels;
+    final minOffset = _controller.positions.last.minScrollExtent;
+    final maxOffset = _controller.positions.last.maxScrollExtent;
+
+    if (isStart) {
+      return (offset <= minOffset + fadeLength)
+          ? 1 - (offset / fadeLength).clamp(0.0, 1.0)
+          : 0.0;
+    } else {
+      return (offset >= maxOffset - fadeLength)
+          ? 1 - ((maxOffset - offset) / fadeLength).clamp(0.0, 1.0)
+          : 0.0;
+    }
+  }
 
   void _updateScrollState() {
     if (!_controllerIsReady) {
